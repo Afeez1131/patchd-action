@@ -1,0 +1,39 @@
+name: "Patchd Security Scan"
+description: "AI-powered security scanning for every PR — finds vulnerabilities before they ship"
+author: "Patchd"
+
+branding:
+  icon: shield
+  color: red
+
+inputs:
+  api_key:
+    description: "Patchd API key. Generate one at patchd.dev → Settings → API Keys. Store as a GitHub Secret."
+    required: true
+  fail_on_critical:
+    description: "Fail the PR check (block merge) when critical issues are found."
+    required: false
+    default: "true"
+  max_files:
+    description: "Maximum number of files to scan per PR."
+    required: false
+    default: "15"
+  file_extensions:
+    description: "Comma-separated list of file extensions to scan."
+    required: false
+    default: ".py,.js,.ts,.go,.java,.php,.rb,.rs,.jsx,.tsx,.sh,.sql"
+
+outputs:
+  critical_count:
+    description: "Number of critical security issues found across all scanned files."
+  warnings_count:
+    description: "Number of warnings found across all scanned files."
+
+runs:
+  using: "docker"
+  image: "Dockerfile"
+  env:
+    PATCHD_API_KEY: ${{ inputs.api_key }}
+    FAIL_ON_CRITICAL: ${{ inputs.fail_on_critical }}
+    MAX_FILES: ${{ inputs.max_files }}
+    FILE_EXTENSIONS: ${{ inputs.file_extensions }}
