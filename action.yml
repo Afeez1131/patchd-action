@@ -1,5 +1,5 @@
 name: "Patchd Security Scan"
-description: "AI-powered security scanning for every PR — finds vulnerabilities before they ship"
+description: "AI-powered security scanning for every PR, finds vulnerabilities before they ship"
 author: "Patchd"
 
 branding:
