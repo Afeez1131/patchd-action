@@ -56,16 +56,33 @@ EXTENSION_TO_LANGUAGE = {
 # HTTP sessions
 
 
-def gh_session() -> requests.Session:
+def gh_session(token: str | None = None) -> requests.Session:
+    """GitHub API session. Uses the App installation token if available, else GITHUB_TOKEN."""
     s = requests.Session()
     s.headers.update(
         {
-            "Authorization": f"Bearer {GITHUB_TOKEN}",
+            "Authorization": f"Bearer {token or GITHUB_TOKEN}",
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
         }
     )
     return s
+
+
+def get_app_installation_token(patchd: requests.Session, repository: str) -> str | None:
+    """Ask patchd API for a GitHub App installation token for this repo."""
+    try:
+        resp = patchd.post(
+            f"{PATCHD_API_URL}/api/github/token",
+            json={"repository": repository},
+            timeout=15,
+        )
+        if resp.status_code == 200:
+            return resp.json().get("token")
+        print(f"ℹ️  App token unavailable ({resp.status_code}) — posting as github-actions bot")
+    except Exception as exc:
+        print(f"ℹ️  App token request failed: {exc} — posting as github-actions bot")
+    return None
 
 
 def patchd_session() -> requests.Session:
@@ -335,7 +352,6 @@ def build_annotations(file_results: list[dict]) -> list[dict]:
 def main() -> int:
     owner, repo = GITHUB_REPOSITORY.split("/", 1)
 
-    gh = gh_session()
     patchd = patchd_session()
 
     event = load_event()
@@ -345,8 +361,13 @@ def main() -> int:
 
     print(f"🔍 Patchd Security Scan — {owner}/{repo} PR #{pr_number}")
 
+    # Try to get a GitHub App token so comments show as patchd-app[bot]
+    app_token = get_app_installation_token(patchd, GITHUB_REPOSITORY)
+    gh_read = gh_session()                    # GITHUB_TOKEN — for reading files
+    gh_write = gh_session(token=app_token)    # App token (or fallback) — for posting
+
     # Fetch and filter changed files
-    pr_files = get_pr_files(gh, owner, repo, pr_number)
+    pr_files = get_pr_files(gh_read, owner, repo, pr_number)
     scannable = [
         f
         for f in pr_files
@@ -372,7 +393,7 @@ def main() -> int:
         filename = pr_file["filename"]
         print(f"  → {filename}")
 
-        code = get_file_content(gh, pr_file["contents_url"])
+        code = get_file_content(gh_read, pr_file["contents_url"])
         if not code:
             print(f"    ⚠️  Could not fetch content, skipping.")
             continue
@@ -400,11 +421,11 @@ def main() -> int:
     for fr in file_results:
         if fr["result"].get("critical") or fr["result"].get("warnings"):
             body = build_file_comment(fr["filename"], fr["result"])
-            post_pr_comment(gh, owner, repo, pr_number, body)
+            post_pr_comment(gh_write, owner, repo, pr_number, body)
 
     # Summary comment
     summary_body = build_summary_comment(file_results)
-    post_pr_comment(gh, owner, repo, pr_number, summary_body)
+    post_pr_comment(gh_write, owner, repo, pr_number, summary_body)
 
     # Check Run with inline annotations
     annotations = build_annotations(file_results)
@@ -415,7 +436,7 @@ def main() -> int:
         else "No critical issues found"
     )
     create_check_run(
-        gh, owner, repo, pr_head_sha, conclusion, check_title, summary_body, annotations
+        gh_write, owner, repo, pr_head_sha, conclusion, check_title, summary_body, annotations
     )
 
     # Set outputs for downstream steps
