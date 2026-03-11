@@ -98,9 +98,15 @@ def get_pr_files(gh: requests.Session, owner: str, repo: str, pr: int) -> list[d
     return resp.json()
 
 
-def get_file_content(gh: requests.Session, raw_url: str) -> str | None:
-    resp = gh.get(raw_url, timeout=30)
+def get_file_content(raw_url: str) -> str | None:
+    # raw.githubusercontent.com only wants Authorization — not the GitHub API headers
+    resp = requests.get(
+        raw_url,
+        headers={"Authorization": f"Bearer {GITHUB_TOKEN}"},
+        timeout=30,
+    )
     if resp.status_code != 200:
+        print(f"    ⚠️  raw_url returned {resp.status_code}")
         return None
     return resp.text
 
@@ -366,7 +372,7 @@ def main() -> int:
         filename = pr_file["filename"]
         print(f"  → {filename}")
 
-        code = get_file_content(gh, pr_file["raw_url"])
+        code = get_file_content(pr_file["raw_url"])
         if not code:
             print(f"    ⚠️  Could not fetch content, skipping.")
             continue
