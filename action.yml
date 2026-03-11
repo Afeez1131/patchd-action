@@ -34,6 +34,7 @@ runs:
   image: "Dockerfile"
   env:
     PATCHD_API_KEY: ${{ inputs.api_key }}
+    GITHUB_TOKEN: ${{ github.token }}
     FAIL_ON_CRITICAL: ${{ inputs.fail_on_critical }}
     MAX_FILES: ${{ inputs.max_files }}
     FILE_EXTENSIONS: ${{ inputs.file_extensions }}
