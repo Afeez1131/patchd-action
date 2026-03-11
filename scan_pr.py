@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Patchd GitHub Action — AI-powered security scanning for every PR."""
 
+import base64
 import json
 import os
 import sys
@@ -98,17 +99,16 @@ def get_pr_files(gh: requests.Session, owner: str, repo: str, pr: int) -> list[d
     return resp.json()
 
 
-def get_file_content(raw_url: str) -> str | None:
-    # raw.githubusercontent.com only wants Authorization — not the GitHub API headers
-    resp = requests.get(
-        raw_url,
-        headers={"Authorization": f"Bearer {GITHUB_TOKEN}"},
-        timeout=30,
-    )
+def get_file_content(gh: requests.Session, contents_url: str) -> str | None:
+    # Use the GitHub Contents API (base64-encoded) — works for both public and private repos
+    resp = gh.get(contents_url, timeout=30)
     if resp.status_code != 200:
-        print(f"    ⚠️  raw_url returned {resp.status_code}")
+        print(f"    ⚠️  contents_url returned {resp.status_code}")
         return None
-    return resp.text
+    data = resp.json()
+    if data.get("encoding") != "base64" or not data.get("content"):
+        return None
+    return base64.b64decode(data["content"]).decode("utf-8", errors="replace")
 
 
 def post_pr_comment(
@@ -372,7 +372,7 @@ def main() -> int:
         filename = pr_file["filename"]
         print(f"  → {filename}")
 
-        code = get_file_content(pr_file["raw_url"])
+        code = get_file_content(gh, pr_file["contents_url"])
         if not code:
             print(f"    ⚠️  Could not fetch content, skipping.")
             continue
