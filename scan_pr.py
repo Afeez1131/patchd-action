@@ -207,17 +207,19 @@ def scan_file(
 # Formatting
 
 
-def _format_issue(issue: dict) -> str:
-    lines = [f"**{issue['title']}**"]
+def _issue_detail(issue: dict) -> str:
+    """Render one issue as a collapsible <details> block."""
+    body = []
     if issue.get("what"):
-        lines.append(f"> **What:** {issue['what']}")
+        body.append(f"**What:** {issue['what']}")
     if issue.get("how"):
-        lines.append(f"> **How:** {issue['how']}")
+        body.append(f"**How:** {issue['how']}")
     if issue.get("impact"):
-        lines.append(f"> **Impact:** {issue['impact']}")
+        body.append(f"**Impact:** {issue['impact']}")
     if issue.get("fix"):
-        lines.append(f"> **Fix:** `{issue['fix']}`")
-    return "\n".join(lines)
+        body.append(f"**Fix:** {issue['fix']}")
+    inner = "\n\n".join(body)
+    return f"<details>\n<summary>{issue['title']}</summary>\n\n{inner}\n\n</details>"
 
 
 def build_file_comment(filename: str, result: dict) -> str:
@@ -226,62 +228,53 @@ def build_file_comment(filename: str, result: dict) -> str:
     best_practices = result.get("best_practices", [])
 
     if not (critical or warnings or best_practices):
-        return f"## ✅ Patchd — `{filename}`\n\nNo issues found."
+        return f"**Patchd** — `{filename}` — no issues found ✅"
 
-    lines = [f"## 🔍 Patchd Security Scan — `{filename}`\n"]
-
+    badges = []
     if critical:
-        lines.append(f"### 🚨 Critical Issues ({len(critical)})\n")
-        for issue in critical:
-            lines.append(_format_issue(issue))
-            lines.append("\n---\n")
-
+        badges.append(f"🚨 {len(critical)} critical")
     if warnings:
-        lines.append(f"### ⚠️ Warnings ({len(warnings)})\n")
-        for issue in warnings:
-            lines.append(_format_issue(issue))
-            lines.append("\n---\n")
-
+        badges.append(f"⚠️ {len(warnings)} {'warning' if len(warnings) == 1 else 'warnings'}")
     if best_practices:
-        lines.append(f"### 💡 Best Practices ({len(best_practices)})\n")
-        for issue in best_practices:
-            lines.append(_format_issue(issue))
-            lines.append("\n---\n")
+        badges.append(f"💡 {len(best_practices)} best practice{'s' if len(best_practices) != 1 else ''}")
 
-    return "\n".join(lines)
+    parts = [f"**Patchd** — `{filename}` — {' · '.join(badges)}\n"]
+
+    for issue in critical:
+        parts.append(_issue_detail(issue))
+    for issue in warnings:
+        parts.append(_issue_detail(issue))
+    for issue in best_practices:
+        parts.append(_issue_detail(issue))
+
+    return "\n".join(parts)
 
 
 def build_summary_comment(file_results: list[dict]) -> str:
     total_critical = sum(len(r["result"].get("critical", [])) for r in file_results)
     total_warnings = sum(len(r["result"].get("warnings", [])) for r in file_results)
+    total_bp = sum(len(r["result"].get("best_practices", [])) for r in file_results)
 
-    lines = ["## 🔐 Patchd Security Scan Results\n"]
-    lines.append("| File | Critical | Warnings | Best Practices |")
-    lines.append("|------|----------|----------|----------------|")
+    lines = ["## Patchd Security Scan\n"]
+    lines.append("| File | 🚨 Critical | ⚠️ Warnings | 💡 Best Practices |")
+    lines.append("|------|:-----------:|:-----------:|:-----------------:|")
 
     for fr in file_results:
         res = fr["result"]
         crit = len(res.get("critical", []))
         warn = len(res.get("warnings", []))
         bp = len(res.get("best_practices", []))
-        crit_cell = f"🚨 {crit}" if crit else "✅ 0"
-        warn_cell = f"⚠️ {warn}" if warn else "0"
-        bp_cell = f"💡 {bp}" if bp else "0"
-        lines.append(f"| `{fr['filename']}` | {crit_cell} | {warn_cell} | {bp_cell} |")
+        lines.append(f"| `{fr['filename']}` | {crit or '—'} | {warn or '—'} | {bp or '—'} |")
 
     lines.append("")
     if total_critical:
-        lines.append(
-            f"**Total: {total_critical} critical issue{'s' if total_critical != 1 else ''} "
-            f"and {total_warnings} warning{'s' if total_warnings != 1 else ''} found.**"
-        )
+        lines.append(f"**{total_critical} critical · {total_warnings} warnings · {total_bp} best practices**")
     else:
-        lines.append("**No critical issues found. ✅**")
+        lines.append(f"**No critical issues** · {total_warnings} warnings · {total_bp} best practices")
 
     lines.append("")
-    lines.append(
-        "> Powered by [Patchd](https://patchd.dev) — AI security scanning for founders"
-    )
+    lines.append("---")
+    lines.append("*[Patchd](https://patchd.dev) — AI security scanning for founders*")
     return "\n".join(lines)
 
 
