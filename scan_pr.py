@@ -11,7 +11,14 @@ import requests
 
 # Configuration
 
-PATCHD_API_URL = "https://api.patchd.dev"
+_REQUIRED = ["PATCHD_API_KEY", "GITHUB_TOKEN", "GITHUB_REPOSITORY", "GITHUB_EVENT_PATH"]
+_missing = [v for v in _REQUIRED if not os.environ.get(v)]
+if _missing:
+    print(f"❌ Missing required environment variables: {', '.join(_missing)}")
+    print("   Make sure PATCHD_API_KEY is set in your GitHub Actions secrets.")
+    sys.exit(1)
+
+PATCHD_API_URL = os.environ.get("PATCHD_API_URL", "https://api.patchd.dev").rstrip("/")
 PATCHD_API_KEY = os.environ["PATCHD_API_KEY"]
 GITHUB_TOKEN = os.environ["GITHUB_TOKEN"]
 GITHUB_REPOSITORY = os.environ["GITHUB_REPOSITORY"]  # "owner/repo"
