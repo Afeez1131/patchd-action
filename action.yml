@@ -22,6 +22,10 @@ inputs:
     description: "Comma-separated list of file extensions to scan."
     required: false
     default: ".py,.js,.ts,.go,.java,.php,.rb,.rs,.jsx,.tsx,.sh,.sql"
+  github_token:
+    description: "GitHub token used to post comments. Override with a bot account PAT to show 'patchd-bot' as the commenter."
+    required: false
+    default: ${{ github.token }}
 
 outputs:
   critical_count:
@@ -34,7 +38,7 @@ runs:
   image: "Dockerfile"
   env:
     PATCHD_API_KEY: ${{ inputs.api_key }}
-    GITHUB_TOKEN: ${{ github.token }}
+    GITHUB_TOKEN: ${{ inputs.github_token }}
     FAIL_ON_CRITICAL: ${{ inputs.fail_on_critical }}
     MAX_FILES: ${{ inputs.max_files }}
     FILE_EXTENSIONS: ${{ inputs.file_extensions }}
